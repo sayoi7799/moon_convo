@@ -1,0 +1,5 @@
+import {
+  "sayoi7799/moon_convo" @convo,
+}
+
+pkgtype(kind: "executable")
