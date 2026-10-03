@@ -6,11 +6,19 @@ import {
 }
 
 // Values
+pub let conversation_overhead : Int
+
+pub fn[C : TokenCounter] count_conversation(Array[Message], C) -> Int
+
+pub let message_overhead : Int
+
 pub fn messages_from_json(Json) -> Array[Message] raise DecodeError
 
 pub fn messages_to_json(Array[Message]) -> Json
 
 pub fn parse_messages(String) -> Array[Message] raise DecodeError
+
+pub let tool_call_overhead : Int
 
 // Errors
 pub(all) suberror DecodeError {
@@ -24,6 +32,11 @@ pub(all) enum Body {
   Assistant(content~ : String, tool_calls~ : Array[ToolCall])
   Tool(tool_call_id~ : String, content~ : String)
 } derive(Eq, @debug.Debug)
+
+pub struct ConservativeEstimator {
+}
+pub fn ConservativeEstimator::new() -> Self
+pub impl TokenCounter for ConservativeEstimator
 
 pub(all) struct Message {
   id : String
@@ -42,3 +55,7 @@ pub(all) struct ToolCall {
 // Type aliases
 
 // Traits
+pub(open) trait TokenCounter {
+  fn count_text(Self, String) -> Int
+  fn count_message(Self, Message) -> Int = _
+}

@@ -1,0 +1,6 @@
+import {
+  "sayoi7799/moon_convo" @convo,
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")
