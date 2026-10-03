@@ -102,10 +102,56 @@ fn ceil_div(a : Int, b : Int) -> Int {
 }
 
 ///|
-fn run_tokens(class : CharClass, len : Int, first : Char) -> Int {
+/// What an ASCII letter/digit run looks like, collected while scanning it.
+priv struct RunShape {
+  mut letter : Bool
+  mut digit : Bool
+  mut lower : Bool
+  /// An uppercase letter after the first character, as in `fileName`.
+  mut inner_upper : Bool
+}
+
+///|
+fn RunShape::new() -> RunShape {
+  { letter: false, digit: false, lower: false, inner_upper: false, }
+}
+
+///|
+fn RunShape::add(self : RunShape, c : Char, pos : Int) -> Unit {
+  if c >= '0' && c <= '9' {
+    self.digit = true
+  } else {
+    self.letter = true
+    if c >= 'a' && c <= 'z' {
+      self.lower = true
+    } else if pos > 0 {
+      self.inner_upper = true
+    }
+  }
+}
+
+///|
+/// Mixed letters and digits, or camelCase: ids, hashes, base64. Real
+/// tokenizers split these into short pieces.
+fn RunShape::is_random(self : RunShape) -> Bool {
+  (self.letter && self.digit) || (self.inner_upper && self.lower)
+}
+
+///|
+fn run_tokens(
+  class : CharClass,
+  len : Int,
+  first : Char,
+  shape : RunShape,
+) -> Int {
   match class {
     Cjk => ceil_div(len * 6, 5)
-    AsciiAlnum => ceil_div(len, 3)
+    AsciiAlnum =>
+      if shape.is_random() {
+        ceil_div(len * 2, 3)
+      } else {
+        ceil_div(len, 3)
+      }
     // A single space merges into the following word in BPE tokenizers.
     Space => if len == 1 && first == ' ' { 0 } else { ceil_div(len, 4) }
     AsciiPunct => len
@@ -119,20 +165,25 @@ pub impl TokenCounter for ConservativeEstimator with fn count_text(_, s) {
   let mut run_class : CharClass? = None
   let mut run_len = 0
   let mut first = ' '
+  let mut shape = RunShape::new()
   for c in s {
     let cls = classify(c)
     if run_class != Some(cls) {
       if run_class is Some(prev) {
-        total += run_tokens(prev, run_len, first)
+        total += run_tokens(prev, run_len, first, shape)
       }
       run_class = Some(cls)
       run_len = 0
       first = c
+      shape = RunShape::new()
+    }
+    if cls == AsciiAlnum {
+      shape.add(c, run_len)
     }
     run_len += 1
   }
   if run_class is Some(prev) {
-    total += run_tokens(prev, run_len, first)
+    total += run_tokens(prev, run_len, first, shape)
   }
   total
 }

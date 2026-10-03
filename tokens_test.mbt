@@ -49,13 +49,13 @@ test "message overheads" {
     pinned: false,
     body: Assistant(content="", tool_calls=[call]),
   }
-  assert_eq(@moon_convo.TokenCounter::count_message(c, asst), 24)
+  assert_eq(@moon_convo.TokenCounter::count_message(c, asst), 25)
   let tool : @moon_convo.Message = {
     id: "t",
     pinned: false,
     body: Tool(tool_call_id="c1", content="ok"),
   }
-  assert_eq(@moon_convo.TokenCounter::count_message(c, tool), 10)
+  assert_eq(@moon_convo.TokenCounter::count_message(c, tool), 11)
 }
 
 ///|
@@ -92,4 +92,21 @@ test "custom counter inherits default message overhead" {
 test "punctuation splits runs" {
   assert_eq(est("hello+world"), 5)
   assert_eq(est("x = 1"), 3)
+}
+
+///|
+test "random-looking alphanumeric runs count 1.5 chars per token" {
+  assert_eq(est("Xy7Qm2"), 4)
+  assert_eq(est("abc123"), 4)
+  assert_eq(est("c1"), 2)
+  assert_eq(est("fileName"), 6)
+  assert_eq(est("dGhlIHF1aWNr"), 8)
+}
+
+///|
+test "plain words and numbers keep 3 chars per token" {
+  assert_eq(est("Hello"), 2)
+  assert_eq(est("HTTP"), 2)
+  assert_eq(est("hello"), 2)
+  assert_eq(est("123456"), 2)
 }

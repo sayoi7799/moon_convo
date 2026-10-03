@@ -91,10 +91,10 @@ moon run examples/agent50
 ```
 
 ```
-round 12: 26791 tokens, untouched
-round 13: 32927 -> 20493 tokens, folded 13, dropped 0, truncated 0, cache breaks at #3
+round 12: 26843 tokens, untouched
+round 13: 32985 -> 20551 tokens, folded 13, dropped 0, truncated 0, cache breaks at #3
 ...
-round 43: 32453 -> 22255 tokens, folded 8, dropped 0, truncated 0, cache breaks at #101
+round 43: 32645 -> 21957 tokens, folded 9, dropped 0, truncated 0, cache breaks at #101
 7 of 50 rounds trimmed (prompt cache invalidated); 43 kept the cache intact.
 ```
 
@@ -178,6 +178,7 @@ test "plug in your own counter" {
 |---|---|
 | 中日韩字符（汉字、假名、韩文） | 每字 1.2：n 个字计 ⌈6n/5⌉ |
 | 连续 ASCII 字母/数字 | ⌈长度/3⌉，至少 1 |
+| 其中“像随机串”的段：字母与数字混杂，或驼峰（如 `call_Xy7Q`、base64、`fileName`） | ⌈2×长度/3⌉（每 1.5 字符 1 个） |
 | ASCII 标点、符号 | 每个 1 |
 | 空白 | 单个空格 0；其他空白段 ⌈长度/4⌉，至少 1 |
 | 其他非 ASCII（西里尔、emoji 等） | 每字 2 |
@@ -190,16 +191,16 @@ test "plug in your own counter" {
 | 样本 | 估算 | cl100k | 比值 |
 |---|---|---|---|
 | 中文常规文本 | 74 | 60 | 1.23 |
-| 中文技术文本 | 60 | 53 | 1.13 |
+| 中文技术文本 | 62 | 53 | 1.17 |
 | 英文 | 60 | 29 | 2.07 |
-| Python / JSON / MoonBit 代码 | 78 / 85 / 88 | 43 / 47 / 51 | 1.7–1.8 |
+| Python / JSON / MoonBit 代码 | 78 / 87 / 98 | 43 / 47 / 51 | 1.8–1.9 |
 | 日文 | 54 | 43 | 1.26 |
 | emoji 混合 | 26 | 21 | 1.24 |
 | **生僻汉字**（饕餮魑魅…） | 14 | 30 | **0.47** |
-| **随机 id / base64** | 25 | 47 | **0.53** |
+| **随机 id / base64** | 43 | 47 | **0.91** |
 | **时间戳、数字混合** | 31 | 32 | **0.97** |
 
-已知局限：生僻汉字、随机字母数字串、密集数字会**少估**。需要严格上界时，请通过 `TokenCounter` 接入真实分词器。
+已知局限：生僻汉字（约 0.47）、随机字母数字串（约 0.91，已按 1.5 字符/token 计仍略少估）、密集数字（约 0.97）会**少估**。需要严格上界时，请通过 `TokenCounter` 接入真实分词器。
 （`o200k_base` 未校准：运行环境无法下载该编码。）
 
 ## 不变量

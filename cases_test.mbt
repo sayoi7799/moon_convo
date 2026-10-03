@@ -27,10 +27,11 @@ fn check_case(
 }
 
 ///|
-/// Conversation total 4173 tokens:
-/// s 16, u1 13, a1 68 (3 calls × 20), t1..t3 1009 each, a2 12, u2 12,
-/// three single-call rounds (28 + 309), af 11, plus 3 overhead.
-/// A folded 1000-token result costs 36, saving 973.
+/// Conversation total 4185 tokens:
+/// s 16, u1 13, a1 71 (3 calls × 21), t1..t3 1010 each, a2 12, u2 12,
+/// three single-call rounds (29 + 310), af 11, plus 3 overhead. Call ids
+/// such as `c1` mix letters and digits, so each costs 2.
+/// A folded 1000-token result costs 37, saving 973.
 let parallel_calls : String =
   #|[{"id": "s", "role": "system", "content": "You are a coding agent."},
   #| {"id": "u1", "role": "user", "content": "Find the bug."},
@@ -56,7 +57,7 @@ let parallel_calls : String =
 
 ///|
 test "case: parallel tool results are folded together" {
-  // target 1400: folding t1, t2, t3 gives 4173 - 3 × 973 = 1254.
+  // target 1400: folding t1, t2, t3 gives 4185 - 3 × 973 = 1266.
   let report = check_case(parallel_calls, 2000, [
     ("s", Kept),
     ("u1", Kept),
@@ -74,14 +75,14 @@ test "case: parallel tool results are folded together" {
     ("t6", Kept),
     ("af", Kept),
   ])
-  assert_eq(report.tokens_after, 1254)
+  assert_eq(report.tokens_after, 1266)
   assert_eq(report.first_modified_index, Some(3))
 }
 
 ///|
 test "case: parallel tool round is dropped as one unit" {
-  // target 1190: folds give 1254; dropping u1 gives 1241; dropping the
-  // whole round (68 + 3 × 36) gives 1065.
+  // target 1190: folds give 1266; dropping u1 gives 1253; dropping the
+  // whole round (71 + 3 × 37) gives 1071.
   let report = check_case(parallel_calls, 1700, [
     ("s", Kept),
     ("u1", Dropped),
@@ -99,15 +100,15 @@ test "case: parallel tool round is dropped as one unit" {
     ("t6", Kept),
     ("af", Kept),
   ])
-  assert_eq(report.tokens_after, 1065)
+  assert_eq(report.tokens_after, 1071)
   assert_eq(report.first_modified_index, Some(1))
 }
 
 ///|
 test "case: consecutive tool rounds" {
-  // Total 3249: s 11, u 13, six rounds of 28 + 509. A folded 500-token
-  // result costs 35, saving 474. target 1750: three folds give 1827,
-  // dropping round 1 (63) gives 1764, round 2 gives 1701.
+  // Total 3261: s 11, u 13, six rounds of 29 + 510. A folded 500-token
+  // result costs 36, saving 474. target 1750: three folds give 1839,
+  // dropping round 1 (65) gives 1774, round 2 gives 1709.
   let src =
     #|[{"id": "s", "role": "system", "content": "Agent."},
     #| {"id": "u", "role": "user", "content": "Run the tests."},
@@ -139,7 +140,7 @@ test "case: consecutive tool rounds" {
     ("a6", Kept),
     ("t6", Kept),
   ])
-  assert_eq(report.tokens_after, 1701)
+  assert_eq(report.tokens_after, 1709)
 }
 
 ///|
