@@ -2,7 +2,7 @@ name = "sayoi7799/moon_convo"
 
 version = "0.1.0"
 
-readme = "README.md"
+readme = "README.mbt.md"
 
 repository = ""
 
