@@ -1,0 +1,44 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "sayoi7799/moon_convo"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn messages_from_json(Json) -> Array[Message] raise DecodeError
+
+pub fn messages_to_json(Array[Message]) -> Json
+
+pub fn parse_messages(String) -> Array[Message] raise DecodeError
+
+// Errors
+pub(all) suberror DecodeError {
+  DecodeError(String)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub(all) enum Body {
+  System(String)
+  User(String)
+  Assistant(content~ : String, tool_calls~ : Array[ToolCall])
+  Tool(tool_call_id~ : String, content~ : String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Message {
+  id : String
+  pinned : Bool
+  body : Body
+} derive(Eq, @debug.Debug)
+pub fn Message::role_name(Self) -> String
+pub fn Message::text(Self) -> String
+
+pub(all) struct ToolCall {
+  id : String
+  name : String
+  arguments : String
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
