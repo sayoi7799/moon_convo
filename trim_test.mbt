@@ -238,3 +238,131 @@ test "pinned tool result is not folded" {
   assert_eq(out[3], ms[3])
   assert_eq(action_of(report, "t2"), (Folded, OldToolResult))
 }
+
+///|
+fn say(id : String, text : String) -> @moon_convo.Message {
+  { id, pinned: false, body: Assistant(content=text, tool_calls=[]), }
+}
+
+///|
+fn ids(ms : Array[@moon_convo.Message]) -> Array[String] {
+  ms.map(m => m.id)
+}
+
+///|
+test "drop oldest units first" {
+  let ms = [sys("s", "be brief")]
+  for k in 1..<=5 {
+    ms.push(user("q\{k}", words(300)))
+    ms.push(say("r\{k}", words(300)))
+  }
+  let (out, report) = run(ms, 2400)
+  for id in ["q1", "r1", "q2", "r2", "q3"] {
+    assert_eq(action_of(report, id), (Dropped, OldestUnit))
+  }
+  assert_eq(action_of(report, "r3"), (Kept, UnderBudget))
+  assert_eq(action_of(report, "q4"), (Kept, RecentUnit))
+  assert_eq(action_of(report, "q5"), (Kept, LastUser))
+  assert_eq(action_of(report, "s"), (Kept, System))
+  assert_eq(ids(out), ["s", "r3", "q4", "r4", "q5", "r5"])
+  assert_eq(report.first_modified_index, Some(1))
+  assert_true(report.tokens_after <= report.target)
+}
+
+///|
+test "tool exchange is dropped whole and long results truncated" {
+  let (out, report) = run(five_rounds(), 1500)
+  assert_eq(action_of(report, "a1"), (Dropped, OldestUnit))
+  assert_eq(action_of(report, "t1"), (Dropped, OldestUnit))
+  assert_eq(action_of(report, "a2"), (Kept, RecentUnit))
+  assert_eq(action_of(report, "t2"), (Folded, OldToolResult))
+  assert_eq(action_of(report, "t3"), (Truncated, TooLong))
+  @moon_convo.validate(out)
+  assert_true(report.tokens_after <= 1500)
+  assert_eq(
+    report.tokens_after,
+    @moon_convo.count_conversation(out, estimator()),
+  )
+}
+
+///|
+test "last user message is kept even outside recent units" {
+  let ms = [sys("s", "be brief"), user("u", "refactor everything")]
+  for k in 1..<=10 {
+    ms.append(round(k, 200))
+  }
+  let (out, report) = run(ms, 1500)
+  assert_eq(action_of(report, "u"), (Kept, LastUser))
+  assert_eq(action_of(report, "a1"), (Dropped, OldestUnit))
+  assert_true(ids(out).contains("u"))
+}
+
+///|
+test "unit with a pinned message is not dropped" {
+  let ms = five_rounds()
+  ms[2] = pin(ms[2])
+  let (out, report) = run(ms, 1500)
+  assert_eq(action_of(report, "a1"), (Kept, Pinned))
+  assert_true(ids(out).contains("t1"))
+  @moon_convo.validate(out)
+}
+
+///|
+test "truncate an overlong message" {
+  let (out, report) = run([sys("s", "be brief"), user("u", words(5000))], 1000)
+  assert_eq(action_of(report, "u"), (Truncated, TooLong))
+  let text = out[1].text()
+  assert_true(text.contains("…[已截断约"))
+  assert_true(text.has_prefix("abc"))
+  assert_true(text.has_suffix("abc"))
+  assert_true(report.tokens_after <= report.target)
+}
+
+///|
+test "truncation never splits an emoji" {
+  let sb = StringBuilder()
+  for _ in 0..<600 {
+    sb.write_string("😀")
+  }
+  let config = { ..@moon_convo.Config::default(), lang: En, }
+  let (out, _) = run([user("u", sb.to_string())], 300, config~)
+  let text = out[0].text()
+  assert_true(text.contains("…[truncated ~"))
+  assert_true(text.has_prefix("😀") && text.has_suffix("😀"))
+  for c in text {
+    assert_true(c.to_int() < 0xD800 || c.to_int() > 0xDFFF)
+  }
+}
+
+///|
+test "truncate_text" {
+  let t = words(1000)
+  let cut = @moon_convo.truncate_text(t, 100, estimator(), En)
+  assert_true(@moon_convo.TokenCounter::count_text(estimator(), cut) <= 100)
+  assert_true(cut.contains("…[truncated ~"))
+  assert_eq(@moon_convo.truncate_text("short", 100, estimator(), En), "short")
+}
+
+///|
+test "cannot fit when irreducible parts exceed the budget" {
+  let call : @moon_convo.ToolCall = {
+    id: "c1",
+    name: "write_file",
+    arguments: words(3000),
+  }
+  let ms : Array[@moon_convo.Message] = [
+    sys("s", "be brief"),
+    user("u", "go"),
+    { id: "a1", pinned: false, body: Assistant(content="", tool_calls=[call]), },
+    { id: "t1", pinned: false, body: Tool(tool_call_id="c1", content="ok"), },
+  ]
+  try run(ms, 500) catch {
+    @moon_convo.CannotFit(tokens~, budget~) => {
+      assert_eq(budget, 500)
+      assert_true(tokens > 500)
+    }
+    e => fail("unexpected \{e}")
+  } noraise {
+    _ => fail("expected CannotFit")
+  }
+}

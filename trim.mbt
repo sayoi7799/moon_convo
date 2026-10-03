@@ -24,6 +24,11 @@ pub fn[C : TokenCounter] trim(
     raise ProtectedExceedsBudget(protected_tokens~, budget~)
   }
   state.fold(target)
+  state.drop_units(target)
+  state.truncate(target)
+  if state.total > budget {
+    raise CannotFit(tokens=state.total, budget~)
+  }
   state.finish(budget, target, triggered=true)
 }
 
@@ -172,6 +177,115 @@ fn[C : TokenCounter] State::fold(self : State[C], target : Int) -> Unit {
       }
     }
   }
+}
+
+///|
+/// Whether unit `u` may never be dropped: it holds a system or pinned message
+/// or the last user message, or is among the `keep_recent_units` latest.
+fn[C] State::unit_protected(self : State[C], u : Int) -> Bool {
+  u >= self.units.length() - self.config.keep_recent_units ||
+  self.unit_has_pinned(u) ||
+  (self.last_user >= 0 && self.unit_of[self.last_user] == u) ||
+  self.units[u].indices().iter().any(i => self.input[i].body is System(_))
+}
+
+///|
+/// Step 2: drop whole unprotected units, oldest first.
+fn[C] State::drop_units(self : State[C], target : Int) -> Unit {
+  for u in 0..<self.units.length() {
+    if self.total <= target {
+      return
+    }
+    if self.unit_protected(u) {
+      continue
+    }
+    for i in self.units[u].indices() {
+      self.total -= self.tokens_now[i]
+      self.tokens_now[i] = 0
+      self.current[i] = None
+      self.actions[i] = Dropped
+      self.reasons[i] = Some(OldestUnit)
+    }
+  }
+}
+
+///|
+/// Step 3: truncate the largest remaining non-system, non-pinned message
+/// (ties: earliest), each at most once, until the target is reached. Content
+/// keeps at least `min_truncate_tokens`; tool-call arguments are never cut.
+fn[C : TokenCounter] State::truncate(self : State[C], target : Int) -> Unit {
+  let tried = Array::make(self.input.length(), false)
+  while self.total > target {
+    let mut best = -1
+    for i, cur in self.current {
+      guard cur is Some(m) &&
+        !tried[i] &&
+        !m.pinned &&
+        !(m.body is System(_)) &&
+        self.counter.count_text(m.text()) > self.config.min_truncate_tokens else {
+        continue
+      }
+      if best < 0 || self.tokens_now[i] > self.tokens_now[best] {
+        best = i
+      }
+    }
+    if best < 0 {
+      return
+    }
+    tried[best] = true
+    guard self.current[best] is Some(m) else { return }
+    let text_tokens = self.counter.count_text(m.text())
+    let want = text_tokens - (self.total - target)
+    let want = if want < self.config.min_truncate_tokens {
+      self.config.min_truncate_tokens
+    } else {
+      want
+    }
+    let cut = m.with_text(
+      truncate_text(m.text(), want, self.counter, self.config.lang),
+    )
+    if self.counter.count_message(cut) < self.tokens_now[best] {
+      self.replace(best, cut, Truncated, TooLong)
+    }
+  }
+}
+
+///|
+/// Cuts `text` to at most `max_tokens` by keeping its head and tail (half the
+/// kept characters each) around a truncation marker. Works on code points, so
+/// surrogate pairs are never split. Returns `text` unchanged if it fits; if
+/// even the bare marker is over `max_tokens`, returns the bare marker.
+pub fn[C : TokenCounter] truncate_text(
+  text : String,
+  max_tokens : Int,
+  counter : C,
+  lang : Lang,
+) -> String {
+  let original = counter.count_text(text)
+  if original <= max_tokens {
+    return text
+  }
+  let chars = text.to_array()
+  let len = chars.length()
+  fn build(keep : Int) -> String {
+    let head = String::from_array(chars[:(keep + 1) / 2])
+    let tail = String::from_array(chars[len - keep / 2:])
+    let removed = original - counter.count_text(head) - counter.count_text(tail)
+    head + truncation_marker(lang, removed) + tail
+  }
+
+  // Largest number of kept characters that fits.
+  let mut lo = 0
+  let mut hi = len - 1
+  while lo < hi {
+    let mid = (lo + hi + 1) / 2
+    if counter.count_text(build(mid)) <= max_tokens {
+      lo = mid
+    } else {
+      hi = mid - 1
+    }
+  }
+  build(lo)
 }
 
 ///|

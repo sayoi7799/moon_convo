@@ -76,3 +76,12 @@ pub fn fold_placeholder(
 fn is_placeholder(text : String) -> Bool {
   text.has_prefix("[已省略：") || text.has_prefix("[omitted: result of ")
 }
+
+///|
+/// The marker inserted where truncation removed text.
+fn truncation_marker(lang : Lang, tokens : Int) -> String {
+  match lang {
+    Zh => "…[已截断约 \{tokens} tokens]…"
+    En => "…[truncated ~\{tokens} tokens]…"
+  }
+}

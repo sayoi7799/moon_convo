@@ -26,6 +26,8 @@ pub let tool_call_overhead : Int
 
 pub fn[C : TokenCounter] trim(Array[Message], Int, C, config? : Config) -> (Array[Message], TrimReport) raise TrimError
 
+pub fn[C : TokenCounter] truncate_text(String, Int, C, Lang) -> String
+
 pub fn validate(Array[Message]) -> Unit raise ValidationError
 
 // Errors

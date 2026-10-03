@@ -45,3 +45,15 @@ pub fn Message::text(self : Message) -> String {
     Assistant(content~, ..) | Tool(content~, ..) => content
   }
 }
+
+///|
+/// A copy of the message with its text content replaced.
+fn Message::with_text(self : Message, text : String) -> Message {
+  let body : Body = match self.body {
+    System(_) => System(text)
+    User(_) => User(text)
+    Assistant(tool_calls~, ..) => Assistant(content=text, tool_calls~)
+    Tool(tool_call_id~, ..) => Tool(tool_call_id~, content=text)
+  }
+  { ..self, body, }
+}
