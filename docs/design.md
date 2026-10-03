@@ -116,7 +116,7 @@ N 按单元计而非按 user 消息计：agent 常在一条 user 指令下连续
 3. **截断**：每次选当前最长的可截断消息（非 system、非 pinned；同长取下标小者），截到恰好补足差额、但不少于 `min_truncate_tokens`；保留首尾各一半，中间插入标记：
    - Zh：`…[已截断约 N tokens]…`
    - En：`…[truncated ~N tokens]…`
-   只截断 `content`，不截断工具调用 `arguments`（会破坏 JSON）。对任意计数器，通过对保留字符数二分查找确定截断点。
+   只截断 `content`，不截断工具调用 `arguments`（会破坏 JSON）。已是折叠占位文本或已含截断标记的消息不再截断。对任意计数器，通过对保留字符数二分查找确定截断点。
 4. 仍 > 预算 ⇒ `CannotFit(tokens, budget)`；在 预算 与 T 之间则接受。
 
 ### 幂等性

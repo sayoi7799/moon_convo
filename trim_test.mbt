@@ -366,3 +366,21 @@ test "cannot fit when irreducible parts exceed the budget" {
     _ => fail("expected CannotFit")
   }
 }
+
+///|
+test "already truncated or folded text is not truncated again" {
+  // The pinned system message keeps the total above the 10% target, so a
+  // second pass with the same config is triggered again.
+  let config = {
+    ..@moon_convo.Config::default(),
+    high_water_pct: 10,
+    low_water_pct: 10,
+    min_truncate_tokens: 4,
+  }
+  let ms = [sys("s", words(600)), user("u", words(2000))]
+  let (out, report) = run(ms, 1000, config~)
+  assert_eq(action_of(report, "u"), (Truncated, TooLong))
+  let (again, report2) = run(out, 1000, config~)
+  assert_eq(again, out)
+  assert_eq(action_of(report2, "u"), (Kept, LastUser))
+}

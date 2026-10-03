@@ -85,3 +85,10 @@ fn truncation_marker(lang : Lang, tokens : Int) -> String {
     En => "…[truncated ~\{tokens} tokens]…"
   }
 }
+
+///|
+/// Whether `text` already went through truncation (in either language), so
+/// truncation is never applied twice.
+fn is_truncated(text : String) -> Bool {
+  text.contains("…[已截断约 ") || text.contains("…[truncated ~")
+}

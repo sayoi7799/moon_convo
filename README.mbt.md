@@ -128,7 +128,7 @@ Body = System(text) | User(text)
    pinned 结果、已折叠的结果、占位文本不比原文短的结果不折叠。
 2. **整组删除**：从最旧的单元开始删除。永不删除：system、含 pinned 消息的单元、最近 N 个单元、最后一条 user 消息所在单元。
 3. **截断**：每次选当前最长的非 system、非 pinned 消息，保留首尾、中间插入 `…[已截断约 N tokens]…`，
-   内容至少保留 `min_truncate_tokens`。只截断 `content`，不截断工具参数（否则 JSON 损坏）。按码点切分，不会拆开 emoji。
+   内容至少保留 `min_truncate_tokens`。已折叠或已截断过的消息不再截断（保证幂等）。只截断 `content`，不截断工具参数（否则 JSON 损坏）。按码点切分，不会拆开 emoji。
 4. 仍超出预算 → `CannotFit`；介于低水位和预算之间则接受。
 
 ### 默认配置
@@ -204,7 +204,7 @@ test "plug in your own counter" {
 
 ## 不变量
 
-以下性质对任意合法输入都成立，每条都有 quickcheck 属性测试（`prop_test.mbt`，每条 300 个随机对话）：
+以下性质对任意合法输入都成立，每条都有 quickcheck 属性测试（`prop_test.mbt`，每条 300 个随机对话；另有一条在随机配置下——任意高低水位、K、N、截断下限、语言——检查预算、配对和幂等）：
 
 1. 输出的 token 数 ≤ 预算，否则返回 `ProtectedExceedsBudget` / `CannotFit` 错误
 2. 不存在孤立的工具调用或工具结果（输出通过 `validate`）

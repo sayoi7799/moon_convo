@@ -213,6 +213,8 @@ fn[C] State::drop_units(self : State[C], target : Int) -> Unit {
 /// Step 3: truncate the largest remaining non-system, non-pinned message
 /// (ties: earliest), each at most once, until the target is reached. Content
 /// keeps at least `min_truncate_tokens`; tool-call arguments are never cut.
+/// Placeholders and already-truncated text are skipped, which keeps a second
+/// `trim` of the output a no-op.
 fn[C : TokenCounter] State::truncate(self : State[C], target : Int) -> Unit {
   let tried = Array::make(self.input.length(), false)
   while self.total > target {
@@ -222,6 +224,8 @@ fn[C : TokenCounter] State::truncate(self : State[C], target : Int) -> Unit {
         !tried[i] &&
         !m.pinned &&
         !(m.body is System(_)) &&
+        !is_placeholder(m.text()) &&
+        !is_truncated(m.text()) &&
         self.counter.count_text(m.text()) > self.config.min_truncate_tokens else {
         continue
       }

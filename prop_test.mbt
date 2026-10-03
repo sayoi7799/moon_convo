@@ -247,3 +247,49 @@ test "prop: idempotent" {
     seed=6,
   )
 }
+
+///|
+/// A random valid config: 10 <= low <= high <= 100, K in 0..3, N in 0..4,
+/// truncation floor in 0..99.
+fn random_config(rs : @splitmix.RandomState) -> @moon_convo.Config {
+  let low = 10 + rand(rs, 90)
+  {
+    high_water_pct: low + rand(rs, 101 - low),
+    low_water_pct: low,
+    keep_recent_tool_rounds: rand(rs, 4),
+    keep_recent_units: rand(rs, 5),
+    min_truncate_tokens: rand(rs, 100),
+    lang: if rand(rs, 2) == 0 {
+      Zh
+    } else {
+      En
+    },
+  }
+}
+
+///|
+test "prop: budget, pairing and idempotency hold under random configs" {
+  @quickcheck.check(
+    (c : Case) => {
+      // Derived from the case so a shrunk case keeps its config.
+      let config = random_config(
+        @splitmix.new(seed=c.budget.to_int64().reinterpret_as_uint64()),
+      )
+      let (out, _) = @moon_convo.trim(
+        c.messages(),
+        c.budget,
+        estimator(),
+        config~,
+      ) catch {
+        ProtectedExceedsBudget(..) | CannotFit(..) => return true
+        e => fail("unexpected error \{e.to_repr()}")
+      }
+      @moon_convo.validate(out)
+      let (again, _) = @moon_convo.trim(out, c.budget, estimator(), config~)
+      @moon_convo.count_conversation(out, estimator()) <= c.budget &&
+      again == out
+    },
+    count=400,
+    seed=8,
+  )
+}
