@@ -38,7 +38,7 @@ pub(all) struct Message { id : String; pinned : Bool; body : Body }
 ## 3. 原子单元与校验
 
 ```moonbit
-enum Unit {
+enum AtomicUnit {  // 不叫 Unit：避免遮蔽内置 Unit 类型
   Single(Int)                                            // system / user / 无工具调用的 assistant
   ToolExchange(assistant~ : Int, results~ : Array[Int])  // assistant + 其全部工具结果
 }
