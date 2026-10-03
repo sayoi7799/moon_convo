@@ -10,6 +10,8 @@ pub let conversation_overhead : Int
 
 pub fn[C : TokenCounter] count_conversation(Array[Message], C) -> Int
 
+pub fn group_units(Array[Message]) -> Array[AtomicUnit] raise ValidationError
+
 pub let message_overhead : Int
 
 pub fn messages_from_json(Json) -> Array[Message] raise DecodeError
@@ -20,12 +22,31 @@ pub fn parse_messages(String) -> Array[Message] raise DecodeError
 
 pub let tool_call_overhead : Int
 
+pub fn validate(Array[Message]) -> Unit raise ValidationError
+
 // Errors
 pub(all) suberror DecodeError {
   DecodeError(String)
 } derive(Eq, @debug.Debug)
 
+pub(all) suberror ValidationError {
+  OrphanToolCall(String, String)
+  OrphanToolResult(String, String)
+  DuplicateToolCallId(String, String)
+  DuplicateToolResult(String, String)
+  ToolResultOutOfPlace(String, String)
+  DuplicateMessageId(String)
+} derive(Eq, @debug.Debug)
+
 // Types and methods
+pub(all) enum AtomicUnit {
+  Single(Int)
+  ToolExchange(assistant~ : Int, results~ : Array[Int])
+} derive(Eq, @debug.Debug)
+pub fn AtomicUnit::end(Self) -> Int
+pub fn AtomicUnit::indices(Self) -> Array[Int]
+pub fn AtomicUnit::start(Self) -> Int
+
 pub(all) enum Body {
   System(String)
   User(String)
