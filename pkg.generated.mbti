@@ -10,6 +10,8 @@ pub let conversation_overhead : Int
 
 pub fn[C : TokenCounter] count_conversation(Array[Message], C) -> Int
 
+pub fn fold_placeholder(Lang, String, Int) -> String
+
 pub fn group_units(Array[Message]) -> Array[AtomicUnit] raise ValidationError
 
 pub let message_overhead : Int
@@ -22,11 +24,20 @@ pub fn parse_messages(String) -> Array[Message] raise DecodeError
 
 pub let tool_call_overhead : Int
 
+pub fn[C : TokenCounter] trim(Array[Message], Int, C, config? : Config) -> (Array[Message], TrimReport) raise TrimError
+
 pub fn validate(Array[Message]) -> Unit raise ValidationError
 
 // Errors
 pub(all) suberror DecodeError {
   DecodeError(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) suberror TrimError {
+  Invalid(ValidationError)
+  InvalidConfig(String)
+  ProtectedExceedsBudget(protected_tokens~ : Int, budget~ : Int)
+  CannotFit(tokens~ : Int, budget~ : Int)
 } derive(Eq, @debug.Debug)
 
 pub(all) suberror ValidationError {
@@ -39,6 +50,13 @@ pub(all) suberror ValidationError {
 } derive(Eq, @debug.Debug)
 
 // Types and methods
+pub(all) enum Action {
+  Kept
+  Folded
+  Dropped
+  Truncated
+} derive(Eq, @debug.Debug)
+
 pub(all) enum AtomicUnit {
   Single(Int)
   ToolExchange(assistant~ : Int, results~ : Array[Int])
@@ -54,10 +72,25 @@ pub(all) enum Body {
   Tool(tool_call_id~ : String, content~ : String)
 } derive(Eq, @debug.Debug)
 
+pub(all) struct Config {
+  high_water_pct : Int
+  low_water_pct : Int
+  keep_recent_tool_rounds : Int
+  keep_recent_units : Int
+  min_truncate_tokens : Int
+  lang : Lang
+} derive(Eq, @debug.Debug)
+pub fn Config::default() -> Self
+
 pub struct ConservativeEstimator {
 }
 pub fn ConservativeEstimator::new() -> Self
 pub impl TokenCounter for ConservativeEstimator
+
+pub(all) enum Lang {
+  Zh
+  En
+} derive(Eq, @debug.Debug)
 
 pub(all) struct Message {
   id : String
@@ -67,10 +100,41 @@ pub(all) struct Message {
 pub fn Message::role_name(Self) -> String
 pub fn Message::text(Self) -> String
 
+pub(all) struct MessageAction {
+  id : String
+  index : Int
+  action : Action
+  reason : Reason
+  tokens_before : Int
+  tokens_after : Int
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Reason {
+  System
+  Pinned
+  RecentUnit
+  RecentToolRound
+  LastUser
+  UnderBudget
+  OldToolResult
+  OldestUnit
+  TooLong
+} derive(Eq, @debug.Debug)
+
 pub(all) struct ToolCall {
   id : String
   name : String
   arguments : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct TrimReport {
+  triggered : Bool
+  budget : Int
+  target : Int
+  tokens_before : Int
+  tokens_after : Int
+  first_modified_index : Int?
+  actions : Array[MessageAction]
 } derive(Eq, @debug.Debug)
 
 // Type aliases
